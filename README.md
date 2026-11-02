@@ -2,7 +2,7 @@
 
 ## Design the database schema.
 
-![alt text](https://github.com/[username]/[reponame]/blob/[branch]/image.jpg?raw=true)
+![alt text](https://github.com/Suruta/highloaded-apps-task-4/blob/main/files/High-level-System-architecture.drawio.svg?raw=true)
 (db schema, file attached)
 
 ## Would you store account balances separately from transactions?
