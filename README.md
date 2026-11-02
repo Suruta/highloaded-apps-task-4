@@ -3,7 +3,7 @@
 ## Design the database schema.
 
 ![alt text](https://github.com/Suruta/highloaded-apps-task-4/blob/main/files/High-level-System-architecture.drawio.svg?raw=true)
-(db schema, file attached)
+![alt text](https://github.com/Suruta/highloaded-apps-task-4/blob/main/files/DB-schema-architecture.drawio.svg?raw=true)
 
 ## Would you store account balances separately from transactions?
 
@@ -101,7 +101,7 @@ Yes, but not blindly.
 Statement generation is a read-heavy workload. Running all statement queries against the primary could reduce the capacity available for financial writes.
 Therefore, I would route statement queries to replicas.
 However, there is an important problem: replication lag.
-(We need a consistency mechanism.) TODO
+We would solve it with monotonic reads.
 
 ## How would you guarantee consistent statements?
 
