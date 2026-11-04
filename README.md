@@ -16,20 +16,8 @@ SELECT available_balance
 FROM account_balances
 WHERE account_id = 123456;
 ```
-Advantages:
-- Fast balance retrieval.
-- No need to scan historical transactions.
-- Suitable for high-throughput banking applications.
-Disadvantages:
-- Balance and ledger must be updated atomically.
-- Bugs in update logic can create inconsistencies.
-
-Use both:
-- `ledger_entries` stores the permanent financial history.
-- `account_balances` stores the current balance.
-
-Both must be updated in the same database transaction.
-If the transaction fails, both updates must roll back.
+A statement query that computes SUM(amount) over millions of rows per account is O(n) and would make every login slow.
+Storing the balance gives O(1) balance reads.
 
 ## Would you shard transactions by account ID or transaction date?
 
@@ -48,34 +36,38 @@ Usually when quering we ask: "give me all transactions for account X", "what is 
 
 ## How would you implement primary-replica replication?
 
-One primary, one sync replica, other two async replicas
+One primary, one sync replica, other two async replicas.
+One sync replica is needed if primary db crashes.
 
 ## Should statement queries use read replicas?
 
-Yes. Statement generation is a read-heavy workload. Running all statement queries against the primary could reduce the capacity available for financial writes.
-Therefore, I would route statement queries to replicas.
-However, there is an important problem: replication lag.
-We would solve it with monotonic reads. Once client reads new data we keep it as it is and don't show the old data.
+Yes, but with conditions.
+When we want to see our balance we should request it from primary db, also this operation is very cheap, not a big deal for primary db.
+If we want to see our history of payments we should use followers to offload the leader, since having replication lags is not a problem.
+
 
 ## How would you guarantee consistent statements?
 
-Using Strong serialized isolation.
+Statement query reads a single consistent snapshot taken at the start of the query.
+Even if concurrent writes arrive mid-query, the statement sees a point-in-time view.
+Once a customer reads from a follower replica, keep sending them to that follower, so they never see old data.
 
 ## How would you handle late-arriving transactions
 
-If transaction is arriving late, we would
+`txn_timestamp` = business time(when the event actually happened)
+`posted_at` = system time(when it was recorded)
+Late transactions with `txn_timestamp` before the cutoff are inserted with their original business date
+`balance_after` is computed by recomputing the balance chain from the last confirmed point
 
 ## How would you archive old transactions?
 
-Keeping all old transactions it's very costy, on top of that if we had indexing, even more costy. Long backup duration.
-We would identify 0-12 month as active, 1 year or more as historical db.
+Time-based partitioning on the transaction table
+After 12–24 months, partitions are detached from the live shard and exported to cold storage.
 
 ## How would you recover from primary database failure?
 
 Db shardener detects fail of primary through heart beat check.
-We can choose one of its sync followers replication to be leader, cuz it will be always up to date.
-
-In case if one of the primary dbs fails, We will choose a new db from read replicas based on who has most latest data. Read replicate becomes a new leader.
+We can choose its sync followers replication to be leader, cuz it has always been up to date.
 
 ## Challenge
 
