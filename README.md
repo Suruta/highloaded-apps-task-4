@@ -36,27 +36,27 @@ Usually when quering we ask: "give me all transactions for account X", "what is 
 
 ## How would you implement primary-replica replication?
 
-One primary, one sync replica, other two async replicas.
+One primary, one sync replica, other two async replicas.  
 One sync replica is needed if primary db crashes.
 
 ## Should statement queries use read replicas?
 
-Yes, but with conditions.
-When we want to see our balance we should request it from primary db, also this operation is very cheap, not a big deal for primary db.
+Yes, but with conditions.  
+When we want to see our balance we should request it from primary db, also this operation is very cheap, not a big deal for primary db.  
 If we want to see our history of payments we should use followers to offload the leader, since having replication lags is not a problem.
 
 
 ## How would you guarantee consistent statements?
 
-Statement query reads a single consistent snapshot taken at the start of the query.
-Even if concurrent writes arrive mid-query, the statement sees a point-in-time view.
+Statement query reads a single consistent snapshot taken at the start of the query.  
+Even if concurrent writes arrive mid-query, the statement sees a point-in-time view.  
 Once a customer reads from a follower replica, keep sending them to that follower, so they never see old data.
 
 ## How would you handle late-arriving transactions
 
-`txn_timestamp` = business time(when the event actually happened)
-`posted_at` = system time(when it was recorded)
-Late transactions with `txn_timestamp` before the cutoff are inserted with their original business date
+`txn_timestamp` = business time(when the event actually happened)  
+`posted_at` = system time(when it was recorded)  
+Late transactions with `txn_timestamp` before the cutoff are inserted with their original business date  
 `balance_after` is computed by recomputing the balance chain from the last confirmed point
 
 ## How would you archive old transactions?
@@ -71,19 +71,21 @@ We can choose its sync followers replication to be leader, cuz it has always bee
 
 ## Challenge
 
-A customer requests a statement at 12:00.
+A customer requests a statement at 12:00.  
 At 12:00:01, a new transaction is committed on the primary but hasn't reached the replica.
 
 ### Answer
 
-When the customer performs any write, the application records the leader's replication log position. The next statement request carries this position and is routed to a replica whose applied log position ≥ that value. If no replica has caught up, the read falls back to the leader.
+When the customer performs any write, the application records the leader's replication log position.  
+The next statement request carries this position and is routed to a replica whose applied log position ≥ that value.  
+If no replica has caught up, the read falls back to the leader.
 
 The statement query runs under snapshot isolation. All tables are read from the same snapshot taken at query start. This guarantees no read skew
 
 ```
 last_txn.balance_after  ==  account.balance_amount   (in the same snapshot)
 ```
-If they match → statement is internally consistent, ship it
+If they match → statement is internally consistent, ship it  
 If they don't → the replica is in an inconsistent intermediate state, reject and retry
 
 
